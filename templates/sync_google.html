@@ -1,0 +1,136 @@
+<h1>Local Calendar Access</h1>
+<!-- Initial Setup Section -->
+<div id="setup_section">
+    <h2>One-Time Setup Required</h2>
+    <p>Instructional video <a href="https://www.youtube.com/watch?v=B2E82UPUnOY">here</a></p>
+    <div id="setup_steps">
+        <ol>
+            <li>Go to <a href='https://console.cloud.google.com/'>Google Cloud Console</a></li>
+            <li>Create a new project (or select an existing one)</li>
+            <li>Enable the Google Calendar API for your project</li>
+            <li>Go to Credentials → Create Credentials → OAuth Client ID</li>
+            <li>Choose 'Desktop Application' as the application type</li>
+            <li>Download the credentials JSON file</li>
+            <li>Save it as 'desktop_client_secret.json' in this application's config directory</li>
+            <li>Click 'Start Authorization' below once complete</li>
+        </ol>
+    </div>
+</div>
+
+<!-- Authorization Section -->
+<div id="auth_section" class="hidden">
+    <button onclick="initiateAuth()">Start Calendar Authorization</button>
+</div>
+
+<!-- Credentials Upload Section -->
+<div id="upload_section">
+    <h2>Upload Google Credentials</h2>
+    <div id="drop_zone">
+        <p>Drag & drop your credentials file here or click to select</p>
+        <input type="file" id="credentials_file" accept="application/json,.json" required>
+    </div>
+    <div id="file_name"></div>
+</div>
+
+<!-- Status Messages -->
+<div id="status_message" class="hidden"></div>
+
+<script>
+    function showMessage(message, isError = false) {
+        const statusDiv = document.getElementById('status_message');
+        statusDiv.className = isError ? 'error' : 'success';
+        statusDiv.textContent = message;
+        statusDiv.style.display = 'block';
+    }
+
+    function initiateAuth() {
+        showMessage('Starting authorization process...');
+        fetch('/initiate_auth')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message);
+                    document.getElementById('setup_section').classList.add('hidden');
+                    document.getElementById('events_section').classList.remove('hidden');
+                } else {
+                    showMessage(data.message || data.error, true);
+                }
+            })
+            .catch(error => showMessage('Authorization failed: ' + error, true));
+    }
+
+    function uploadCredentials(file) {
+        const formData = new FormData();
+        formData.append('credentials', file);
+
+        showMessage('Uploading credentials...');
+
+        fetch('/upload_google_credentials', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage('Credentials uploaded successfully');
+                // Trigger the authorization process
+                initiateAuth();
+            } else {
+                showMessage(data.message || 'Failed to upload credentials', true);
+            }
+        })
+        .catch(error => showMessage('Error uploading credentials: ' + error, true));
+    }
+
+    function handleFileSelect(file) {
+        if (file) {
+            document.getElementById('file_name').textContent = `Selected file: ${file.name}`;
+            uploadCredentials(file);
+        }
+    }
+
+    const dropZone = document.getElementById('drop_zone');
+    const fileInput = document.getElementById('credentials_file');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleFileSelect(e.dataTransfer.files[0]);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        handleFileSelect(e.target.files[0]);
+    });
+</script>
+
+<style>
+    #drop_zone {
+        border: 2px dashed #ccc;
+        border-radius: 20px;
+        width: 300px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+    }
+    #drop_zone.dragover {
+        background-color: #e1e1e1;
+    }
+    #credentials_file {
+        display: none;
+    }
+    #file_name {
+        margin-top: 10px;
+        font-style: italic;
+    }
+</style>
